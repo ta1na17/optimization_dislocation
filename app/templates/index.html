@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Сборка итогового файла</title>
+  <link rel="stylesheet" href="/static/styles.css" />
+</head>
+<body>
+  <main class="container">
+    <h1>Сборка итогового файла</h1>
+    <p class="subtitle">Загрузите Excel-файлы и нажмите «Собрать итог»</p>
+
+    <section class="card">
+      <div id="dropZone" class="drop-zone">
+        <p>Перетащите файлы сюда или</p>
+        <label class="btn secondary" for="fileInput">Выберите файлы</label>
+        <input id="fileInput" type="file" accept=".xls,.xlsx" multiple />
+      </div>
+
+      <div class="hint">
+        <strong>Важно:</strong> Если в файле не содержится название собственника, переименуйте файл в одно из допустимых названий собственника.
+        <ul>
+          {% for owner in owners %}
+            <li>{{ owner }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+
+      <h3>Загруженные файлы</h3>
+      <ul id="filesList" class="files-list"></ul>
+
+      <div class="actions">
+        <button id="clearBtn" class="btn secondary">Очистить список</button>
+        <button id="buildBtn" class="btn">Собрать итог</button>
+      </div>
+    </section>
+
+    <section id="statusCard" class="card hidden">
+      <h3>Статус</h3>
+      <p id="statusText"></p>
+      <div id="resultMeta" class="hidden">
+        <p id="dupCount"></p>
+        <p id="dropCount"></p>
+      </div>
+      <button id="downloadBtn" class="btn hidden">Скачать итоговый файл</button>
+    </section>
+
+    <section id="droppedCard" class="card hidden">
+      <button id="toggleDropped" class="btn secondary">Показать отброшенные строки</button>
+      <ul id="droppedList" class="dropped-list hidden"></ul>
+    </section>
+  </main>
+  <script src="/static/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,88 @@
+{% load static %}
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="csrf-token" content="{{ csrf_token }}" />
+  <title>Сборка итогового файла</title>
+  <link rel="icon" href="{% static 'flaticon-train.png' %}" type="image/png" sizes="128x128" />
+  <link rel="apple-touch-icon" href="{% static 'flaticon-train.png' %}" />
+  <link rel="stylesheet" href="{% static 'styles.css' %}" />
+</head>
+<body>
+  <main class="container">
+    <h1 class="page-title">
+      <img class="page-title__icon" src="{% static 'flaticon-train.png' %}" width="40" height="40" alt="" aria-hidden="true" />
+      <span>Сборка итогового файла</span>
+    </h1>
+    <p class="subtitle">Загрузите Excel-файлы и нажмите «Собрать итог»</p>
+
+    <section class="card">
+      <div id="uploadShell" class="upload-shell">
+        <input id="fileInput" type="file" accept=".xls,.xlsx,.XLS,.XLSX" multiple />
+        <div id="dropZone" class="drop-zone">
+          <p>Перетащите файлы сюда или</p>
+          <label class="btn secondary" for="fileInput">Выберите файлы</label>
+        </div>
+        <div id="filesPanel" class="files-panel hidden">
+          <div class="files-panel__head">
+            <h3 class="files-panel__title">Загруженные файлы</h3>
+            <label class="btn secondary files-panel__add-btn" for="fileInput">Добавить файлы</label>
+          </div>
+          <p class="muted">Собственник в итоговом файле берётся из строки Excel, если там он есть; иначе — из столбца «Вручную» (если выбрали) или из автоопределения (как в «Авто»). Если авто не сработало, выберите собственника вручную — без этого «Собрать итог» недоступно. Отдельный файл можно убрать кнопкой «×». Ещё файлы — кнопка «Добавить файлы» или перетаскивание в эту область.</p>
+
+          <div class="table-wrap">
+            <table class="files-table" id="filesTable">
+              <thead>
+                <tr>
+                  <th>Файл</th>
+                  <th class="files-table__col-owner" title="Как в предпросмотре: по содержимому таблицы или имени файла">Авто:<br /><span class="th-hint">собственник</span></th>
+                  <th class="files-table__col-owner" title="Откуда взято автоопределение">Откуда</th>
+                  <th>Размер</th>
+                  <th class="files-table__col-owner" title="Обязательно, если «Авто» не определено. Иначе можно оставить «как в файле».">Вручную<br /><span class="th-hint">собственник</span></th>
+                  <th class="th-remove"><span class="sr-only">Убрать из списка</span></th>
+                </tr>
+              </thead>
+              <tbody id="filesTableBody"></tbody>
+            </table>
+          </div>
+          <p id="previewStatus" class="muted small"></p>
+
+          <div class="actions">
+            <button id="clearBtn" type="button" class="btn secondary">Очистить список</button>
+            <button id="buildBtn" type="button" class="btn">Собрать итог</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="ownerHint" class="hint">
+        <strong>Важно:</strong> Если в файле не содержится название собственника, переименуйте файл в одно из допустимых названий или выберите собственника в столбце «Вручную» в списке загруженных файлов.
+        <ul>
+          {% for owner in owners %}
+            <li>{{ owner }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </section>
+
+    <section id="statusCard" class="card hidden">
+      <h3>Статус</h3>
+      <p id="statusText"></p>
+      <div id="resultMeta" class="hidden">
+        <p id="dupCount"></p>
+        <p id="dropCount"></p>
+      </div>
+      <button id="downloadBtn" type="button" class="btn hidden">Скачать итоговый файл</button>
+    </section>
+
+    <section id="droppedCard" class="card hidden">
+      <button id="toggleDropped" type="button" class="btn secondary">Показать отброшенные строки</button>
+      <ul id="droppedList" class="dropped-list hidden"></ul>
+    </section>
+  </main>
+
+  <script type="application/json" id="owners-json">{{ owners_json|safe }}</script>
+  <script src="{% static 'app.js' %}"></script>
+</body>
+</html>
