@@ -221,6 +221,14 @@ document.addEventListener('click', (e) => {
 window.addEventListener('scroll', syncOpenPanelPosition, true);
 window.addEventListener('resize', syncOpenPanelPosition);
 
+/** Строка под таблицей: актуальное число файлов (после удаления строк). Не проверять previewInFlight — из runPreview() нельзя вызывать до finally: флаг ещё true. */
+function updatePreviewDoneLine() {
+  if (!previewStatus || !items.length) return;
+  if (items.every((e) => e.preview)) {
+    previewStatus.textContent = `Готово: проверено файлов — ${items.length}`;
+  }
+}
+
 function syncUploadView() {
   if (!dropZone || !filesPanel) return;
   const has = items.length > 0;
@@ -277,6 +285,8 @@ function removeFileAt(index) {
     queueMicrotask(() => {
       void runPreview();
     });
+  } else {
+    updatePreviewDoneLine();
   }
 }
 
@@ -411,6 +421,9 @@ async function runPreview() {
   syncBuildButton();
   previewStatus.textContent = 'Определяем собственников по файлам…';
 
+  /** Успешно применили ответ к текущему списку и поколению — строку «Готово» ставим в finally, когда previewInFlight уже false. */
+  let applyPreviewOk = false;
+
   const formData = new FormData();
   items.forEach((e) => formData.append('files', e.file));
 
@@ -432,7 +445,7 @@ async function runPreview() {
     list.forEach((info, i) => {
       if (items[i]) items[i].preview = info;
     });
-    previewStatus.textContent = `Готово: проверено файлов — ${list.length}`;
+    applyPreviewOk = myGen === previewGen;
     renderTable();
   } catch (e) {
     if (e.name === 'AbortError' || myGen !== previewGen) return;
@@ -440,6 +453,9 @@ async function runPreview() {
   } finally {
     previewInFlight = false;
     previewAbort = null;
+    if (applyPreviewOk && items.length && items.every((e) => e.preview)) {
+      previewStatus.textContent = `Готово: проверено файлов — ${items.length}`;
+    }
     syncBuildButton();
   }
 }
