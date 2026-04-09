@@ -180,6 +180,49 @@ input[type="file"] { display: none; }
 .muted { color: var(--c-5); font-size: 14px; margin: 8px 0 12px; opacity: 0.88; }
 .muted.small { font-size: 13px; margin-top: 6px; }
 
+.preview-status-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 6px;
+  min-height: 26px;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 12px;
+}
+
+.status-row__msg {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+
+.spinner {
+  box-sizing: border-box;
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border: 3px solid var(--c-3);
+  border-top-color: var(--c-6);
+  border-radius: 50%;
+  animation: status-spin 0.72s linear infinite;
+}
+
+.spinner[hidden] {
+  display: none !important;
+}
+
+@keyframes status-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .table-wrap {
   overflow-x: auto;
   border: 1px solid var(--c-3);

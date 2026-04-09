@@ -19,6 +19,8 @@ const droppedCard = document.getElementById('droppedCard');
 const droppedList = document.getElementById('droppedList');
 const toggleDropped = document.getElementById('toggleDropped');
 const previewStatus = document.getElementById('previewStatus');
+const previewSpinner = document.getElementById('previewSpinner');
+const buildSpinner = document.getElementById('buildSpinner');
 
 /** Плавно прокрутить страницу к самому низу (после появления блока статуса/итогов). */
 function scrollPageToBottomSmooth() {
@@ -41,6 +43,50 @@ let previewGen = 0;
 let previewAbort = null;
 /** @type {string | null} */
 let lastDownloadObjectUrl = null;
+/** @type {(() => void) | null} */
+let previewProgressStop = null;
+/** @type {(() => void) | null} */
+let buildProgressStop = null;
+
+/**
+ * Пока идёт один запрос к серверу, нарастиваю счётчик от 1 до (total−1); после ответа показываю финальный текст отдельно.
+ * @param {number} total
+ * @param {(done: number, total: number) => void} onTick
+ * @returns {() => void}
+ */
+function runStagedProgress(total, onTick) {
+  const t = Math.max(1, Math.floor(Number(total)) || 1);
+  let done = 1;
+  onTick(done, t);
+  if (t <= 1) {
+    return () => {};
+  }
+  const cap = t - 1;
+  const delay = Math.min(480, Math.max(130, Math.floor(3200 / t)));
+  const id = setInterval(() => {
+    if (done < cap) {
+      done += 1;
+      onTick(done, t);
+    }
+  }, delay);
+  return () => clearInterval(id);
+}
+
+function stopPreviewProgressUI() {
+  if (previewProgressStop) {
+    previewProgressStop();
+    previewProgressStop = null;
+  }
+  if (previewSpinner) previewSpinner.hidden = true;
+}
+
+function stopBuildProgressUI() {
+  if (buildProgressStop) {
+    buildProgressStop();
+    buildProgressStop = null;
+  }
+  if (buildSpinner) buildSpinner.hidden = true;
+}
 
 function revokeDownloadObjectUrl() {
   if (lastDownloadObjectUrl) {
@@ -225,6 +271,7 @@ window.addEventListener('resize', syncOpenPanelPosition);
 function updatePreviewDoneLine() {
   if (!previewStatus || !items.length) return;
   if (items.every((e) => e.preview)) {
+    stopPreviewProgressUI();
     previewStatus.textContent = `Готово: проверено файлов — ${items.length}`;
   }
 }
@@ -270,6 +317,7 @@ function removeFileAt(index) {
   items.splice(index, 1);
   revokeDownloadObjectUrl();
   if (!items.length) {
+    stopPreviewProgressUI();
     previewStatus.textContent = '';
     statusCard.classList.add('hidden');
     droppedCard.classList.add('hidden');
@@ -409,6 +457,7 @@ function syncBuildButton() {
 
 async function runPreview() {
   if (!items.length) {
+    stopPreviewProgressUI();
     previewStatus.textContent = '';
     previewInFlight = false;
     syncBuildButton();
@@ -419,7 +468,13 @@ async function runPreview() {
   previewInFlight = true;
   previewAbort = new AbortController();
   syncBuildButton();
-  previewStatus.textContent = 'Определяем собственников по файлам…';
+  stopPreviewProgressUI();
+  if (previewSpinner) previewSpinner.hidden = false;
+  const previewTotal = items.length;
+  const stopPreviewTick = runStagedProgress(previewTotal, (k, t) => {
+    if (previewStatus) previewStatus.textContent = `Проверка файлов: ${k} из ${t}…`;
+  });
+  previewProgressStop = stopPreviewTick;
 
   /** Успешно применили ответ к текущему списку и поколению — строку «Готово» ставим в finally, когда previewInFlight уже false. */
   let applyPreviewOk = false;
@@ -453,8 +508,13 @@ async function runPreview() {
   } finally {
     previewInFlight = false;
     previewAbort = null;
-    if (applyPreviewOk && items.length && items.every((e) => e.preview)) {
-      previewStatus.textContent = `Готово: проверено файлов — ${items.length}`;
+    stopPreviewTick();
+    if (previewProgressStop === stopPreviewTick) previewProgressStop = null;
+    if (myGen === previewGen) {
+      if (previewSpinner) previewSpinner.hidden = true;
+      if (applyPreviewOk && items.length && items.every((e) => e.preview)) {
+        previewStatus.textContent = `Готово: проверено файлов — ${items.length}`;
+      }
     }
     syncBuildButton();
   }
@@ -493,6 +553,8 @@ clearBtn.addEventListener('click', () => {
   revokeDownloadObjectUrl();
   previewGen += 1;
   previewAbort?.abort();
+  stopPreviewProgressUI();
+  stopBuildProgressUI();
   syncUploadView();
   renderTable();
   previewStatus.textContent = '';
@@ -525,8 +587,16 @@ buildBtn.addEventListener('click', async () => {
   resultMeta.classList.add('hidden');
   downloadBtn.classList.add('hidden');
   revokeDownloadObjectUrl();
-  statusText.textContent = 'Идет обработка…';
   scrollPageToBottomSmooth();
+
+  stopBuildProgressUI();
+  if (buildSpinner) buildSpinner.hidden = false;
+  const buildTotal = items.length;
+  const stopBuildTick = runStagedProgress(buildTotal, (k, t) => {
+    statusText.textContent = `Идёт обработка: ${k} из ${t} файлов…`;
+  });
+  buildProgressStop = stopBuildTick;
+  buildBtn.disabled = true;
 
   const formData = new FormData();
   items.forEach((e) => formData.append('files', e.file));
@@ -555,7 +625,7 @@ buildBtn.addEventListener('click', async () => {
     revokeDownloadObjectUrl();
     lastDownloadObjectUrl = URL.createObjectURL(blob);
     downloadBtn.dataset.downloadName = data.file_name || 'Итог.xlsx';
-    statusText.textContent = 'Итог готов — скачайте файл';
+    statusText.textContent = `Обработано файлов: ${buildTotal} из ${buildTotal}. Итог готов — скачайте файл`;
     resultMeta.classList.remove('hidden');
     dupCount.textContent = `Найдено дублей: ${data.duplicates_count}`;
     dropCount.textContent = `Отброшено строк: ${data.dropped_rows_count}`;
@@ -577,6 +647,11 @@ buildBtn.addEventListener('click', async () => {
   } catch {
     statusText.textContent = 'Ошибка при формировании итогового файла';
     scrollPageToBottomSmooth();
+  } finally {
+    stopBuildTick();
+    if (buildProgressStop === stopBuildTick) buildProgressStop = null;
+    if (buildSpinner) buildSpinner.hidden = true;
+    syncBuildButton();
   }
 });
 

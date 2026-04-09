@@ -47,7 +47,10 @@
               <tbody id="filesTableBody"></tbody>
             </table>
           </div>
-          <p id="previewStatus" class="muted small"></p>
+          <div id="previewStatusWrap" class="preview-status-wrap muted small">
+            <span id="previewSpinner" class="spinner" hidden aria-hidden="true"></span>
+            <span id="previewStatus"></span>
+          </div>
 
           <div class="actions">
             <button id="clearBtn" type="button" class="btn secondary">Очистить список</button>
@@ -68,7 +71,10 @@
 
     <section id="statusCard" class="card hidden">
       <h3>Статус</h3>
-      <p id="statusText"></p>
+      <div class="status-row">
+        <span id="buildSpinner" class="spinner" hidden aria-hidden="true"></span>
+        <p id="statusText" class="status-row__msg"></p>
+      </div>
       <div id="resultMeta" class="hidden">
         <p id="dupCount"></p>
         <p id="dropCount"></p>
