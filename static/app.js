@@ -77,7 +77,10 @@ function stopPreviewProgressUI() {
     previewProgressStop();
     previewProgressStop = null;
   }
-  if (previewSpinner) previewSpinner.hidden = true;
+  if (previewSpinner) {
+    previewSpinner.hidden = true;
+    previewSpinner.style.setProperty('--p', '0');
+  }
 }
 
 function stopBuildProgressUI() {
@@ -85,7 +88,21 @@ function stopBuildProgressUI() {
     buildProgressStop();
     buildProgressStop = null;
   }
-  if (buildSpinner) buildSpinner.hidden = true;
+  if (buildSpinner) {
+    buildSpinner.hidden = true;
+    buildSpinner.style.setProperty('--p', '0');
+  }
+}
+
+/** Доля заполнения кольца (0…1): дуга var(--c-6) растёт с прогрессом «файлов». */
+function setRingProgress(el, done, total) {
+  if (!el) return;
+  const t = Math.max(1, total);
+  const d = Math.max(0, done);
+  const p = Math.min(1, d / t);
+  el.style.setProperty('--p', String(p));
+  el.setAttribute('aria-valuenow', String(Math.min(t, Math.round(d))));
+  el.setAttribute('aria-valuemax', String(t));
 }
 
 function revokeDownloadObjectUrl() {
@@ -468,11 +485,16 @@ async function runPreview() {
   previewInFlight = true;
   previewAbort = new AbortController();
   syncBuildButton();
-  stopPreviewProgressUI();
-  if (previewSpinner) previewSpinner.hidden = false;
   const previewTotal = items.length;
+  stopPreviewProgressUI();
+  if (previewSpinner) {
+    previewSpinner.hidden = false;
+    previewSpinner.setAttribute('role', 'progressbar');
+    previewSpinner.setAttribute('aria-valuemin', '0');
+  }
   const stopPreviewTick = runStagedProgress(previewTotal, (k, t) => {
     if (previewStatus) previewStatus.textContent = `Проверка файлов: ${k} из ${t}…`;
+    setRingProgress(previewSpinner, k, t);
   });
   previewProgressStop = stopPreviewTick;
 
@@ -511,10 +533,11 @@ async function runPreview() {
     stopPreviewTick();
     if (previewProgressStop === stopPreviewTick) previewProgressStop = null;
     if (myGen === previewGen) {
-      if (previewSpinner) previewSpinner.hidden = true;
       if (applyPreviewOk && items.length && items.every((e) => e.preview)) {
+        setRingProgress(previewSpinner, previewTotal, previewTotal);
         previewStatus.textContent = `Готово: проверено файлов — ${items.length}`;
       }
+      if (previewSpinner) previewSpinner.hidden = true;
     }
     syncBuildButton();
   }
@@ -589,11 +612,16 @@ buildBtn.addEventListener('click', async () => {
   revokeDownloadObjectUrl();
   scrollPageToBottomSmooth();
 
-  stopBuildProgressUI();
-  if (buildSpinner) buildSpinner.hidden = false;
   const buildTotal = items.length;
+  stopBuildProgressUI();
+  if (buildSpinner) {
+    buildSpinner.hidden = false;
+    buildSpinner.setAttribute('role', 'progressbar');
+    buildSpinner.setAttribute('aria-valuemin', '0');
+  }
   const stopBuildTick = runStagedProgress(buildTotal, (k, t) => {
     statusText.textContent = `Идёт обработка: ${k} из ${t} файлов…`;
+    setRingProgress(buildSpinner, k, t);
   });
   buildProgressStop = stopBuildTick;
   buildBtn.disabled = true;
@@ -625,6 +653,7 @@ buildBtn.addEventListener('click', async () => {
     revokeDownloadObjectUrl();
     lastDownloadObjectUrl = URL.createObjectURL(blob);
     downloadBtn.dataset.downloadName = data.file_name || 'Итог.xlsx';
+    setRingProgress(buildSpinner, buildTotal, buildTotal);
     statusText.textContent = `Обработано файлов: ${buildTotal} из ${buildTotal}. Итог готов — скачайте файл`;
     resultMeta.classList.remove('hidden');
     dupCount.textContent = `Найдено дублей: ${data.duplicates_count}`;

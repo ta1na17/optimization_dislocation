@@ -283,12 +283,22 @@ def _parse_file(uploaded):
     raise ValueError(f'Формат файла не поддерживается: {uploaded.name}')
 
 
-def _sheet_for_destination(destination: str | None) -> str:
+def _sheet_for_destination(destination: str | None) -> str | None:
+    """
+    Итоговый лист только если станция назначения совпадает с базовой станцией листа (ТЗ п.9).
+    Иначе None — строка не включается в итог, а попадает в dropped_rows.
+    """
     dest = (destination or '').strip().lower()
     for sheet, station in BASE_STATIONS.items():
         if dest == station.lower():
             return sheet
-    return 'ПСК'
+    return None
+
+
+DROP_REASON_NON_BASE_DESTINATION = (
+    'станция назначения не совпадает ни с одной базовой станцией итоговых листов '
+    '(Калкаман → лист ПСК, Кызылорда → лист АлОр, Макат → лист Индер) — строка в итог не включается'
+)
 
 
 def _block_for_row(row: Row, sheet: str) -> int:
@@ -633,10 +643,25 @@ def build_report(files, owner_overrides: list[str | None] | None = None):
             dropped.extend(drop_rows)
 
     grouped = {s: defaultdict(list) for s in SHEET_ORDER}
+    rows_in_output = 0
     for row in all_rows:
         sheet = _sheet_for_destination(row.destination_station)
+        if sheet is None:
+            dropped.append(
+                {
+                    'file_name': row.source_file,
+                    'sheet_name': row.source_sheet,
+                    'row_number': row.source_row_number,
+                    'row_preview': (
+                        f'Вагон={row.wagon}, ст.опер.={row.operation_station!r}, ст.назн.={row.destination_station!r}'
+                    ),
+                    'reason': DROP_REASON_NON_BASE_DESTINATION,
+                }
+            )
+            continue
         block = _block_for_row(row, sheet)
         grouped[sheet][block].append(row)
+        rows_in_output += 1
 
     for sheet in SHEET_ORDER:
         grouped[sheet][1].sort(key=lambda r: (r.idle_days is None, -(r.idle_days or 0)))
@@ -654,5 +679,12 @@ def build_report(files, owner_overrides: list[str | None] | None = None):
         'file_base64': base64.b64encode(file_bytes).decode('ascii'),
         'file_name': 'Итог.xlsx',
     }
-    logger.info('Build complete: rows=%s dropped=%s duplicates=%s bytes=%s', len(all_rows), len(dropped), duplicates_count, len(file_bytes))
+    logger.info(
+        'Build complete: normalized=%s in_output=%s dropped=%s duplicates=%s bytes=%s',
+        len(all_rows),
+        rows_in_output,
+        len(dropped),
+        duplicates_count,
+        len(file_bytes),
+    )
     return result, None

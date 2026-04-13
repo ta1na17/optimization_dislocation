@@ -202,25 +202,25 @@ input[type="file"] { display: none; }
   min-width: 0;
 }
 
+/* Кольцо: доля --p (0…1) заливается «чёрным» по часовой стрелке от 12 часов */
 .spinner {
   box-sizing: border-box;
-  width: 24px;
-  height: 24px;
+  --p: 0;
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
-  border: 3px solid var(--c-3);
-  border-top-color: var(--c-6);
   border-radius: 50%;
-  animation: status-spin 0.72s linear infinite;
+  background: conic-gradient(
+    from -90deg,
+    var(--c-6) calc(var(--p) * 360deg),
+    var(--c-3) 0deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #fff calc(100% - 4.5px));
+  mask: radial-gradient(farthest-side, transparent calc(100% - 5px), #fff calc(100% - 4.5px));
 }
 
 .spinner[hidden] {
   display: none !important;
-}
-
-@keyframes status-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .table-wrap {
