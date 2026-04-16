@@ -390,8 +390,9 @@ input[type="file"] { display: none; }
   border: 2px solid var(--c-6);
   border-radius: 10px;
   box-shadow: 0 12px 32px var(--shadow-md);
-  overflow-y: auto;
-  overflow-x: hidden;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
   overscroll-behavior: contain;
   opacity: 0;
   visibility: hidden;
@@ -407,6 +408,14 @@ input[type="file"] { display: none; }
   visibility: visible;
   pointer-events: auto;
   transform: translateY(0) scale(1);
+}
+
+.owner-dd__panel-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
 }
 
 .owner-dd__option {
@@ -434,4 +443,356 @@ input[type="file"] { display: none; }
   background: var(--c-4);
   color: var(--c-6);
   font-weight: 600;
+}
+
+.owner-dd__edit-wrap {
+  flex-shrink: 0;
+  border-top: 1px solid var(--c-3);
+  margin: 6px -2px 0;
+  padding-top: 6px;
+}
+
+.owner-dd__edit-list {
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 9px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  color: var(--c-5);
+  text-align: left;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+  transition: background 0.16s ease, color 0.16s ease;
+}
+
+.owner-dd__edit-list:hover,
+.owner-dd__edit-list:focus-visible {
+  background: var(--c-3);
+  color: var(--c-6);
+  outline: none;
+}
+
+/* Модальное окно редактирования собственников */
+.owner-modal {
+  position: fixed;
+  inset: 0;
+  z-index: 3000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px 16px;
+  box-sizing: border-box;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.28s ease, visibility 0.28s ease;
+}
+
+.owner-modal.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.owner-modal__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(35, 35, 35, 0.38);
+}
+
+.owner-modal__dialog {
+  position: relative;
+  z-index: 1;
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 720px;
+  max-height: calc(100vh - 40px);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  margin: 0;
+  transform: translateY(10px) scale(0.99);
+  transition: transform 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.owner-modal.is-open .owner-modal__dialog {
+  transform: translateY(0) scale(1);
+}
+
+.owner-modal__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-shrink: 0;
+  margin-bottom: 8px;
+}
+
+.owner-modal__title {
+  margin: 0;
+  font-size: 1.15rem;
+  color: var(--c-6);
+}
+
+.owner-modal__close {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--c-3);
+  color: var(--c-6);
+  font: inherit;
+  font-size: 1.4rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.owner-modal__close:hover {
+  background: var(--c-4);
+  color: #fff;
+}
+
+.owner-modal__scroll {
+  flex: 1;
+  min-height: 120px;
+  max-height: calc(100vh - 220px);
+  overflow-y: auto;
+  overflow-x: auto;
+  overscroll-behavior: contain;
+  margin: 0 -4px;
+  padding: 4px;
+  border: 1px solid var(--c-3);
+  border-radius: 8px;
+  background: var(--c-1);
+}
+
+.owner-modal__foot {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
+  margin-top: 12px;
+  padding-top: 4px;
+}
+
+.owner-editor-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.owner-editor-table th {
+  text-align: left;
+  padding: 8px 6px;
+  color: var(--c-6);
+  font-weight: 600;
+  border-bottom: 1px solid var(--c-3);
+  background: var(--c-2);
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  vertical-align: middle;
+}
+
+.owner-editor-th {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  max-width: none;
+}
+
+.owner-editor-th__label {
+  font-weight: 600;
+}
+
+.owner-editor-th__help {
+  position: relative;
+  flex-shrink: 0;
+  box-sizing: border-box;
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  padding: 0;
+  border: 1px solid var(--c-4);
+  border-radius: 50%;
+  background: var(--c-1);
+  color: var(--c-5);
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.owner-editor-th__help:hover,
+.owner-editor-th__help:focus-visible {
+  background: var(--c-3);
+  border-color: var(--c-6);
+  color: var(--c-6);
+  outline: none;
+}
+
+/* Подсказка вынесена в слой на body (см. app.js), поверх модалки и скролла */
+.owner-editor-float-tip {
+  position: fixed;
+  z-index: 12000;
+  box-sizing: border-box;
+  min-width: 200px;
+  max-width: min(360px, calc(100vw - 16px));
+  padding: 11px 14px;
+  border: 1px solid var(--c-6);
+  border-radius: 10px;
+  background: var(--c-2);
+  color: var(--c-5);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.45;
+  text-align: left;
+  white-space: normal;
+  box-shadow: 0 12px 36px rgba(35, 35, 35, 0.22);
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.16s ease, visibility 0.16s ease;
+}
+
+.owner-editor-float-tip.is-visible {
+  opacity: 1;
+  visibility: visible;
+}
+
+.owner-editor-table td {
+  padding: 6px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--c-3);
+}
+
+.owner-editor-table tbody tr:hover {
+  background: var(--c-3);
+}
+
+.owner-editor__th-remove,
+.owner-editor__td-remove {
+  width: 44px;
+  text-align: center;
+}
+
+.owner-editor__input {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 120px;
+  padding: 8px 10px;
+  border: 2px solid var(--c-6);
+  border-radius: 8px;
+  background: var(--c-1);
+  font: inherit;
+  color: var(--c-6);
+  transition: box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.owner-editor__input:focus {
+  outline: none;
+  background: var(--c-2);
+  box-shadow: 0 2px 8px var(--shadow-md);
+}
+
+.owner-editor__remove {
+  box-sizing: border-box;
+  width: 32px;
+  height: 32px;
+  margin: 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: var(--c-3);
+  color: var(--c-6);
+  font: inherit;
+  font-size: 1.25rem;
+  line-height: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.18s ease, color 0.18s ease;
+}
+
+.owner-editor__remove:hover {
+  background: #c45c5c;
+  color: #fff;
+}
+
+/* Диалоги Да / Нет и «ОК» */
+.app-confirm {
+  position: fixed;
+  inset: 0;
+  z-index: 4000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  box-sizing: border-box;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition: opacity 0.22s ease, visibility 0.22s ease;
+}
+
+.app-confirm.is-open {
+  opacity: 1;
+  visibility: visible;
+  pointer-events: auto;
+}
+
+.app-confirm__backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(35, 35, 35, 0.4);
+}
+
+.app-confirm__box {
+  position: relative;
+  z-index: 1;
+  max-width: 420px;
+  width: 100%;
+  padding: 18px 16px;
+  border-radius: 12px;
+  border: 1px solid var(--c-3);
+  background: var(--c-2);
+  box-shadow: 0 12px 36px var(--shadow-md);
+  transform: translateY(8px);
+  transition: transform 0.22s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-confirm.is-open .app-confirm__box {
+  transform: translateY(0);
+}
+
+.app-confirm__msg {
+  margin: 0 0 14px;
+  color: var(--c-5);
+  line-height: 1.45;
+  font-size: 14px;
+}
+
+.app-confirm__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  justify-content: flex-end;
 }
