@@ -1,0 +1,236 @@
+{
+  "rules": [
+    {
+      "canonical_name": "Транзит",
+      "synonyms": [
+        "Транзит",
+        "Transit"
+      ],
+      "file_name_synonyms": [
+        "транзит",
+        "transit"
+      ]
+    },
+    {
+      "canonical_name": "ПМГрупп",
+      "synonyms": [
+        "ПМГрупп",
+        "ПМ групп",
+        "PMGroup"
+      ],
+      "file_name_synonyms": [
+        "пмгрупп",
+        "пм групп",
+        "pmgroup"
+      ]
+    },
+    {
+      "canonical_name": "ВагонСервис",
+      "synonyms": [
+        "ВагонСервис",
+        "Вагон Сервис"
+      ],
+      "file_name_synonyms": [
+        "вагонсервис",
+        "вагон сервис"
+      ]
+    },
+    {
+      "canonical_name": "Атлант",
+      "synonyms": [
+        "Атлант",
+        "ALN"
+      ],
+      "file_name_synonyms": [
+        "атлант",
+        "aln"
+      ]
+    },
+    {
+      "canonical_name": "РефСервис",
+      "synonyms": [
+        "РефСервис",
+        "RDB"
+      ],
+      "file_name_synonyms": [
+        "рефсервис",
+        "rdb"
+      ]
+    },
+    {
+      "canonical_name": "Модум Транс",
+      "synonyms": [
+        "Модум Транс",
+        "Модум",
+        "UVZ"
+      ],
+      "file_name_synonyms": [
+        "модум",
+        "uvz"
+      ]
+    },
+    {
+      "canonical_name": "РЛС",
+      "synonyms": [
+        "РЛС",
+        "RLS"
+      ],
+      "file_name_synonyms": [
+        "рлс",
+        "rls"
+      ]
+    },
+    {
+      "canonical_name": "Еврологистик",
+      "synonyms": [
+        "Еврологистик",
+        "Евро логистик"
+      ],
+      "file_name_synonyms": [
+        "еврологистик",
+        "евро логистик"
+      ]
+    },
+    {
+      "canonical_name": "ПТА",
+      "synonyms": [
+        "ПТА",
+        "PTA"
+      ],
+      "file_name_synonyms": [
+        "пта",
+        "pta"
+      ]
+    },
+    {
+      "canonical_name": "Веста Карго",
+      "synonyms": [
+        "Веста Карго",
+        "Vesta Cargo"
+      ],
+      "file_name_synonyms": [
+        "веста карго",
+        "vesta cargo"
+      ]
+    },
+    {
+      "canonical_name": "КалугаВагонСервис",
+      "synonyms": [
+        "КалугаВагонСервис",
+        "КВС",
+        "KVS"
+      ],
+      "file_name_synonyms": [
+        "калугавагонсервис",
+        "квс",
+        "kvs"
+      ]
+    },
+    {
+      "canonical_name": "УралТранс",
+      "synonyms": [
+        "УралТранс",
+        "Уралтранс",
+        "Урал Транс"
+      ],
+      "file_name_synonyms": [
+        "уралтранс",
+        "урал транс",
+        "uraltrans"
+      ]
+    },
+    {
+      "canonical_name": "ТЭК Урал",
+      "synonyms": [
+        "ТЭК Урал",
+        "Тек Урал",
+        "TEK Ural"
+      ],
+      "file_name_synonyms": [
+        "тэк урал",
+        "tek ural"
+      ]
+    },
+    {
+      "canonical_name": "Транспортные Технологии",
+      "synonyms": [
+        "Транспортные Технологии",
+        "ТТ",
+        "TTS"
+      ],
+      "file_name_synonyms": [
+        "транспортные технологии",
+        "тт",
+        "tts"
+      ]
+    },
+    {
+      "canonical_name": "Транком-Сервис",
+      "synonyms": [
+        "Транком-Сервис",
+        "Транком",
+        "TCS"
+      ],
+      "file_name_synonyms": [
+        "транком",
+        "tcs"
+      ]
+    },
+    {
+      "canonical_name": "Евросиб",
+      "synonyms": [
+        "Евросиб",
+        "EuroSib"
+      ],
+      "file_name_synonyms": [
+        "евросиб",
+        "eurosib"
+      ]
+    },
+    {
+      "canonical_name": "Аквила Транс",
+      "synonyms": [
+        "Аквила Транс",
+        "Аквила",
+        "Aquila"
+      ],
+      "file_name_synonyms": [
+        "аквила",
+        "aquila"
+      ]
+    },
+    {
+      "canonical_name": "Деловой портал",
+      "synonyms": [
+        "Деловой портал",
+        "Деловой портал",
+        "Деловой портал"
+      ],
+      "file_name_synonyms": [
+        "Деловой портал",
+        "Деловой портал"
+      ]
+    },
+    {
+      "canonical_name": "TOO TCM Logisticts",
+      "synonyms": [
+        "TOO TCM Logisticts",
+        "TOO TCM Logisticts",
+        "TOO TCM Logisticts"
+      ],
+      "file_name_synonyms": [
+        "TOO TCM Logisticts",
+        "TOO TCM Logisticts"
+      ]
+    },
+    {
+      "canonical_name": "Тестовая компания",
+      "synonyms": [
+        "тест"
+      ],
+      "file_name_synonyms": [
+        "тест"
+      ]
+    }
+  ]
+}
