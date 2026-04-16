@@ -2,15 +2,16 @@ import json
 
 from django.shortcuts import render
 
-from reports.services.owners import CANONICAL_OWNER_NAMES
+from reports.services.owners import canonical_owner_names
 
 
 def index(request):
+    names = canonical_owner_names()
     return render(
         request,
         'index.html',
         {
-            'owners': CANONICAL_OWNER_NAMES,
-            'owners_json': json.dumps(CANONICAL_OWNER_NAMES, ensure_ascii=False),
+            'owners': names,
+            'owners_json': json.dumps(names, ensure_ascii=False),
         },
     )
