@@ -27,6 +27,8 @@ OWNER_RULES = [
     OwnerRule('Транком-Сервис', ['Транком-Сервис', 'Транком', 'TCS'], ['транком', 'tcs']),
     OwnerRule('Евросиб', ['Евросиб', 'EuroSib'], ['евросиб', 'eurosib']),
     OwnerRule('Аквила Транс', ['Аквила Транс', 'Аквила', 'Aquila'], ['аквила', 'aquila']),
+    OwnerRule('Деловой портал', ['Деловой портал', 'Деловой портал', 'Деловой портал'], ['Деловой портал', 'Деловой портал']),
+    OwnerRule('TOO TCM Logisticts', ['TOO TCM Logisticts', 'TOO TCM Logisticts', 'TOO TCM Logisticts'], ['TOO TCM Logisticts', 'TOO TCM Logisticts']),
 ]
 
 CANONICAL_OWNER_NAMES = [r.canonical_name for r in OWNER_RULES]
