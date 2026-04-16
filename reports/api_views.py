@@ -2,10 +2,11 @@ import json
 import logging
 
 from rest_framework import status
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import JSONParser, MultiPartParser, FormParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
+from reports.services.owners import apply_owner_rules_payload, serialize_owner_rules
 from reports.services.report_builder import (
     build_report,
     preview_owners_for_uploads,
@@ -18,6 +19,29 @@ logger = logging.getLogger('reports.api')
 class HealthApi(APIView):
     def get(self, request):
         return Response({'status': 'ok'})
+
+
+class OwnersConfigApi(APIView):
+    parser_classes = [JSONParser]
+
+    def get(self, request):
+        return Response({'rules': serialize_owner_rules()})
+
+    def post(self, request):
+        raw = request.data.get('rules') if isinstance(request.data, dict) else None
+        if not isinstance(raw, list):
+            return Response({'detail': 'Ожидался объект с полем rules (массив)'}, status=status.HTTP_400_BAD_REQUEST)
+        ok, err, extra = apply_owner_rules_payload(raw)
+        if not ok:
+            return Response({'detail': err or 'Ошибка сохранения'}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {
+                'summary': extra.get('summary', ''),
+                'canonical_names': extra.get('canonical_names', []),
+                'diff': extra.get('diff', {}),
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class PreviewOwnersApi(APIView):
