@@ -1,5 +1,6 @@
 import base64
 import logging
+import re
 from collections import Counter, defaultdict
 from copy import copy
 from dataclasses import dataclass, asdict
@@ -189,20 +190,54 @@ def _normalize_key(key: str) -> str:
     return ' '.join(str(key).strip().lower().split())
 
 
+_UNIFY_SPACE = re.compile(r'[\u00a0\u1680\u2000-\u200b\u202f\u205f\u3000\ufeff]+')
+
+
+def _normalize_station_label(value: str | None) -> str:
+    """
+    Станции из Excel: унифицируем «невидимые» пробелы и NBSP, схлопываем пробелы, регистр.
+    Нужно для сопоставления с базовыми Калкаман / Кызылорда / Макат (ТЗ п.9–10.3).
+    """
+    if value is None or (isinstance(value, float) and pd.isna(value)):
+        return ''
+    s = str(value).replace('\ufeff', '')
+    s = _UNIFY_SPACE.sub(' ', s)
+    s = re.sub(r'\s+', ' ', s).strip().lower()
+    return s
+
+
 def _find_col(cols: list[str], aliases: list[str]) -> str | None:
     normalized = {_normalize_key(c): c for c in cols}
     for alias in aliases:
         if _normalize_key(alias) in normalized:
             return normalized[_normalize_key(alias)]
-    # Сначала более длинные псевдонимы, чтобы «станция отправления» не перехватывалась как «станция»
+    # Подстрочное совпадение: выбираем столбец с самым длинным совпавшим псевдонимом (не «первый в файле»),
+    # чтобы короткое «назначение» не перехватывало у «Ст. назначения» / «Код ст. назн.».
     by_len = sorted(aliases, key=lambda a: len(_normalize_key(a)), reverse=True)
-    for c in cols:
-        nk = _normalize_key(c)
+
+    def longest_alias_in_name(nk: str) -> int:
+        best = 0
         for alias in by_len:
             na = _normalize_key(alias)
-            if len(na) >= 2 and na in nk:
-                return c
-    return None
+            if len(na) < 2:
+                continue
+            if na in nk:
+                best = max(best, len(na))
+        return best
+
+    best_col = None
+    best_len = -1
+    best_idx = 10**9
+    for idx, c in enumerate(cols):
+        nk = _normalize_key(c)
+        L = longest_alias_in_name(nk)
+        if L == 0:
+            continue
+        if L > best_len or (L == best_len and idx < best_idx):
+            best_len = L
+            best_idx = idx
+            best_col = c
+    return best_col
 
 
 def _to_float(value):
@@ -288,9 +323,11 @@ def _sheet_for_destination(destination: str | None) -> str | None:
     Итоговый лист только если станция назначения совпадает с базовой станцией листа (ТЗ п.9).
     Иначе None — строка не включается в итог, а попадает в dropped_rows.
     """
-    dest = (destination or '').strip().lower()
+    dest = _normalize_station_label(destination)
+    if not dest:
+        return None
     for sheet, station in BASE_STATIONS.items():
-        if dest == station.lower():
+        if dest == _normalize_station_label(station):
             return sheet
     return None
 
@@ -300,12 +337,36 @@ DROP_REASON_NON_BASE_DESTINATION = (
     '(Калкаман → лист ПСК, Кызылорда → лист АлОр, Макат → лист Индер) — строка в итог не включается'
 )
 
+# Секции в файлах с повтором шапки / «чужим» назначением: якорная строка с Калкаман/Кызылорда/Макат
+# задаёт лист; строки с назначением = база идут в блоки 1–2 по ТЗ; с назначением ≠ базы — в блок 3 того же листа.
+# Повтор шапки («Вагон №» / подпись столбца назначения) после секции АлОр: до строки МАКАТ небазовые строки — Индер блок 3.
+DROP_REASON_SECTION_NO_ANCHOR = (
+    'станция назначения не базовая и выше по файлу нет строки-якоря с Калкаман / Кызылорда / Макат '
+    'для этой секции листа — строка в итог не включается'
+)
+
+_SUBTABLE_HEADER_WAGON = re.compile(r'(?i)^\s*вагон\s*№\s*$')
+
+
+def _is_subtable_header_row(row: Row) -> bool:
+    """Повторная шапка внутри листа (как в отчётах с двумя блоками вагонов)."""
+    w = (row.wagon or '').strip()
+    if w and _SUBTABLE_HEADER_WAGON.fullmatch(w):
+        return True
+    dnk = _normalize_key(row.destination_station or '')
+    if not dnk:
+        return False
+    for alias in COLUMN_ALIASES['destination_station']:
+        if dnk == _normalize_key(alias):
+            return True
+    return False
+
 
 def _block_for_row(row: Row, sheet: str) -> int:
-    op = (row.operation_station or '').strip().lower()
-    dest = (row.destination_station or '').strip().lower()
-    base = BASE_STATIONS[sheet].lower()
-    all_base = {v.lower() for v in BASE_STATIONS.values()}
+    op = _normalize_station_label(row.operation_station)
+    dest = _normalize_station_label(row.destination_station)
+    base = _normalize_station_label(BASE_STATIONS[sheet])
+    all_base = {_normalize_station_label(v) for v in BASE_STATIONS.values()}
     if op and dest and op == dest:
         return 1
     if dest == base and op != dest:
@@ -644,24 +705,59 @@ def build_report(files, owner_overrides: list[str | None] | None = None):
 
     grouped = {s: defaultdict(list) for s in SHEET_ORDER}
     rows_in_output = 0
+    # (файл, лист Excel) → (нормализованное назначение якоря, итоговый лист ПСК/АлОр/Индер)
+    section_anchor: dict[tuple[str, str], tuple[str, str]] = {}
+    # После внутренней шапки в секции АлОр: небазовые строки до первой строки МАКАТ — в Индер блок 3
+    pre_makat_tail: dict[tuple[str, str], bool] = {}
+
     for row in all_rows:
-        sheet = _sheet_for_destination(row.destination_station)
-        if sheet is None:
-            dropped.append(
-                {
-                    'file_name': row.source_file,
-                    'sheet_name': row.source_sheet,
-                    'row_number': row.source_row_number,
-                    'row_preview': (
-                        f'Вагон={row.wagon}, ст.опер.={row.operation_station!r}, ст.назн.={row.destination_station!r}'
-                    ),
-                    'reason': DROP_REASON_NON_BASE_DESTINATION,
-                }
-            )
+        key = (row.source_file, row.source_sheet)
+        if _is_subtable_header_row(row):
+            anchor = section_anchor.get(key)
+            if anchor and anchor[1] == 'АлОр':
+                pre_makat_tail[key] = True
+            # Служебная строка: не в итог и не в списке «отброшенных» (не ошибка данных)
             continue
-        block = _block_for_row(row, sheet)
-        grouped[sheet][block].append(row)
-        rows_in_output += 1
+
+        dest_norm = _normalize_station_label(row.destination_station)
+        sheet_from_dest = _sheet_for_destination(row.destination_station)
+
+        if sheet_from_dest is not None:
+            pre_makat_tail[key] = False
+            section_anchor[key] = (dest_norm, sheet_from_dest)
+            block = _block_for_row(row, sheet_from_dest)
+            grouped[sheet_from_dest][block].append(row)
+            rows_in_output += 1
+            continue
+
+        if pre_makat_tail.get(key):
+            grouped['Индер'][3].append(row)
+            rows_in_output += 1
+            continue
+
+        anchor = section_anchor.get(key)
+        if anchor is not None:
+            anchor_dest, anchor_sheet = anchor
+            if dest_norm != anchor_dest:
+                grouped[anchor_sheet][3].append(row)
+                rows_in_output += 1
+                continue
+
+        dropped.append(
+            {
+                'file_name': row.source_file,
+                'sheet_name': row.source_sheet,
+                'row_number': row.source_row_number,
+                'row_preview': (
+                    f'Вагон={row.wagon}, ст.опер.={row.operation_station!r}, ст.назн.={row.destination_station!r}'
+                ),
+                'reason': (
+                    DROP_REASON_SECTION_NO_ANCHOR
+                    if not dest_norm
+                    else DROP_REASON_NON_BASE_DESTINATION
+                ),
+            }
+        )
 
     for sheet in SHEET_ORDER:
         grouped[sheet][1].sort(key=lambda r: (r.idle_days is None, -(r.idle_days or 0)))

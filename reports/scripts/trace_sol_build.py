@@ -23,9 +23,12 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from reports.services.report_builder import (
     BASE_STATIONS,
     DROP_REASON_NON_BASE_DESTINATION,
+    DROP_REASON_SECTION_NO_ANCHOR,
     SHEET_ORDER,
     _block_for_row,
+    _is_subtable_header_row,
     _normalize_rows,
+    _normalize_station_label,
     _parse_file,
     _sheet_for_destination,
     preview_owner_for_file,
@@ -44,37 +47,34 @@ def collect_excel_files(root: Path) -> list[Path]:
 
 
 def explain_sheet(dest: str | None) -> tuple[str | None, str]:
-    d = (dest or "").strip().lower()
-    for sheet, station in BASE_STATIONS.items():
-        if d == station.lower():
-            disp = (dest or "").strip() or "(пусто)"
-            return sheet, (
-                f"станция назначения «{disp}» = базовая станция листа «{sheet}» "
-                f"({station} по ТЗ п.9)"
-            )
+    sheet = _sheet_for_destination(dest)
+    if sheet:
+        disp = (dest or "").strip() or "(пусто)"
+        station = BASE_STATIONS[sheet]
+        return sheet, (
+            f"станция назначения «{disp}» = базовая станция листа «{sheet}» "
+            f"({station} по ТЗ п.9)"
+        )
     return None, DROP_REASON_NON_BASE_DESTINATION
 
 
 def explain_block(row, sheet: str) -> str:
-    op = (row.operation_station or "").strip()
-    dest = (row.destination_station or "").strip()
-    base = BASE_STATIONS[sheet]
-    all_bases = set(BASE_STATIONS.values())
-    op_l = op.lower()
-    dest_l = dest.lower()
-    bases_l = {b.lower() for b in all_bases}
+    op = _normalize_station_label(row.operation_station)
+    dest = _normalize_station_label(row.destination_station)
+    base = _normalize_station_label(BASE_STATIONS[sheet])
+    bases_l = {_normalize_station_label(b) for b in BASE_STATIONS.values()}
 
-    if op_l and dest_l and op_l == dest_l:
+    if op and dest and op == dest:
         return (
             "блок 1 — вагон уже на станции (ТЗ п.10.1): "
             "станция операции совпадает со станцией назначения"
         )
-    if dest_l == base.lower() and op_l != dest_l:
+    if dest == base and op != dest:
         return (
             f"блок 2 — вагон на подходе (ТЗ п.10.2): станция назначения = база листа «{sheet}» "
-            f"({base}), станция операции отличается"
+            f"({BASE_STATIONS[sheet]}), станция операции отличается"
         )
-    if dest_l not in bases_l:
+    if dest not in bases_l:
         return (
             "блок 3 — назначение не на базовую станцию (ТЗ п.10.3): "
             "станция назначения не Калкаман / Кызылорда / Макат"
@@ -139,24 +139,49 @@ def main() -> int:
 
     grouped = {s: defaultdict(int) for s in SHEET_ORDER}
     eligible = []
+    section_anchor: dict[tuple[str, str], tuple[str, str]] = {}
+    pre_makat_tail: dict[tuple[str, str], bool] = {}
     for row in all_rows:
-        sh = _sheet_for_destination(row.destination_station)
-        if sh is None:
-            dropped_route.append(
-                {
-                    "file_name": row.source_file,
-                    "sheet_name": row.source_sheet,
-                    "row_number": row.source_row_number,
-                    "row_preview": (
-                        f"Вагон={row.wagon}, ст.опер.={row.operation_station!r}, ст.назн.={row.destination_station!r}"
-                    ),
-                    "reason": DROP_REASON_NON_BASE_DESTINATION,
-                }
-            )
+        key = (row.source_file, row.source_sheet)
+        if _is_subtable_header_row(row):
+            an = section_anchor.get(key)
+            if an and an[1] == "АлОр":
+                pre_makat_tail[key] = True
             continue
-        bl = _block_for_row(row, sh)
-        grouped[sh][bl] += 1
-        eligible.append((row, sh, bl))
+
+        dest_norm = _normalize_station_label(row.destination_station)
+        sh = _sheet_for_destination(row.destination_station)
+        if sh is not None:
+            pre_makat_tail[key] = False
+            section_anchor[key] = (dest_norm, sh)
+            bl = _block_for_row(row, sh)
+            grouped[sh][bl] += 1
+            eligible.append((row, sh, bl))
+            continue
+
+        if pre_makat_tail.get(key):
+            grouped["Индер"][3] += 1
+            eligible.append((row, "Индер", 3))
+            continue
+
+        anchor = section_anchor.get(key)
+        if anchor is not None:
+            anchor_dest, anchor_sheet = anchor
+            if dest_norm != anchor_dest:
+                grouped[anchor_sheet][3] += 1
+                eligible.append((row, anchor_sheet, 3))
+                continue
+        dropped_route.append(
+            {
+                "file_name": row.source_file,
+                "sheet_name": row.source_sheet,
+                "row_number": row.source_row_number,
+                "row_preview": (
+                    f"Вагон={row.wagon}, ст.опер.={row.operation_station!r}, ст.назн.={row.destination_station!r}"
+                ),
+                "reason": DROP_REASON_SECTION_NO_ANCHOR if not dest_norm else DROP_REASON_NON_BASE_DESTINATION,
+            }
+        )
 
     print("\n=== СТАТИСТИКА ===")
     print("Нормализованных строк (до отбора по базам):", len(all_rows))
@@ -183,7 +208,13 @@ def main() -> int:
 
     print("\n=== ЛОГ ПО СТРОКАМ В ИТОГЕ (лист + блок) ===")
     for n, (row, sheet, block) in enumerate(eligible, 1):
-        sh_why = explain_sheet(row.destination_station)[1]
+        if _sheet_for_destination(row.destination_station):
+            sh_why = explain_sheet(row.destination_station)[1]
+        else:
+            sh_why = (
+                f"лист «{sheet}», блок 3: назначение не совпадает с базой текущей секции "
+                "(файл-исключение: в итог только такие строки; строки с назначением = база секции не включаются)"
+            )
         bl_why = explain_block(row, sheet)
         w = row.wagon
         op = row.operation_station or "—"
