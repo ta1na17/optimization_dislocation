@@ -114,7 +114,7 @@ COLUMN_ALIASES = {
         'vagon',
         'wagon',
     ],
-    'wagon_type': ['вид пс', 'тип вагона', 'тип модели'],
+    'wagon_type': ['вид пс', 'тип вагона', 'тип модели', 'модель вагона'],
     'payload': [
         'г/п',
         'гп',
@@ -191,11 +191,13 @@ def _normalize_key(key: str) -> str:
 
 
 _UNIFY_SPACE = re.compile(r'[\u00a0\u1680\u2000-\u200b\u202f\u205f\u3000\ufeff]+')
+_WAGON_MODEL_TYPE = re.compile(r'^\s*1([12])[-\s]')
 
 
 def _normalize_station_label(value: str | None) -> str:
     """
     Станции из Excel: унифицируем «невидимые» пробелы и NBSP, схлопываем пробелы, регистр.
+    В выгрузках dislocation станция часто с суффиксом дороги («Калкаман, КЗХ») — берём имя до запятой.
     Нужно для сопоставления с базовыми Калкаман / Кызылорда / Макат (ТЗ п.9–10.3).
     """
     if value is None or (isinstance(value, float) and pd.isna(value)):
@@ -203,6 +205,8 @@ def _normalize_station_label(value: str | None) -> str:
     s = str(value).replace('\ufeff', '')
     s = _UNIFY_SPACE.sub(' ', s)
     s = re.sub(r'\s+', ' ', s).strip().lower()
+    if ',' in s:
+        s = s.split(',', 1)[0].strip()
     return s
 
 
@@ -268,9 +272,13 @@ def _resolve_wagon_type(owner: str | None, explicit_type, capacity: float | None
     """
     why: list[str] = []
     if explicit_type is not None and str(explicit_type).strip():
-        t = str(explicit_type).strip().upper()
+        raw = str(explicit_type).strip()
+        t = raw.upper()
         if t in {'ПВ', 'КВ'}:
             return t, []
+        model_m = _WAGON_MODEL_TYPE.match(raw)
+        if model_m:
+            return ('ПВ', 'КВ')[model_m.group(1) == '2'], []
         why.append(f'колонка типа/модели: значение {explicit_type!r} — не ПВ и не КВ')
     else:
         why.append('колонка типа/модели: пусто или столбец не сопоставлен с алиасами')
