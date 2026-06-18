@@ -1,6 +1,21 @@
 const ownersEl = document.getElementById('owners-json');
 let CANONICAL_OWNERS = ownersEl ? JSON.parse(ownersEl.textContent || '[]') : [];
 
+/**
+ * Сортировка собственников по русскому алфавиту (А→Я), без учёта регистра.
+ * @param {string[]} names
+ * @returns {string[]}
+ */
+function sortOwnersRu(names) {
+  const collator = new Intl.Collator('ru', { usage: 'sort', sensitivity: 'base' });
+  return (Array.isArray(names) ? names : [])
+    .map((v) => String(v || '').trim())
+    .filter(Boolean)
+    .sort((a, b) => collator.compare(a, b));
+}
+
+CANONICAL_OWNERS = sortOwnersRu(CANONICAL_OWNERS);
+
 const fileInput = document.getElementById('fileInput');
 const filesTableBody = document.getElementById('filesTableBody');
 const buildBtn = document.getElementById('buildBtn');
@@ -47,6 +62,33 @@ let lastDownloadObjectUrl = null;
 let previewProgressStop = null;
 /** @type {(() => void) | null} */
 let buildProgressStop = null;
+
+let previewRetryTimer = null;
+let previewRetryAttempt = 0;
+const PREVIEW_MAX_RETRIES = 4;
+
+function clearPreviewRetry() {
+  if (previewRetryTimer) {
+    clearTimeout(previewRetryTimer);
+    previewRetryTimer = null;
+  }
+  previewRetryAttempt = 0;
+}
+
+function schedulePreviewRetry() {
+  if (!items.length) return;
+  if (previewInFlight) return;
+  if (previewRetryAttempt >= PREVIEW_MAX_RETRIES) return;
+  if (!items.some((e) => !e.preview)) return;
+  if (previewRetryTimer) return;
+  const attempt = (previewRetryAttempt += 1);
+  const delay = Math.min(8000, 700 * 2 ** (attempt - 1));
+  if (previewStatus) previewStatus.textContent = `Проблема соединения. Повтор запроса предпросмотра через ${Math.round(delay / 1000)}с…`;
+  previewRetryTimer = setTimeout(() => {
+    previewRetryTimer = null;
+    void runPreview();
+  }, delay);
+}
 
 /**
  * Пока идёт один запрос к серверу, нарастиваю счётчик от 1 до (total−1); после ответа показываю финальный текст отдельно.
@@ -337,7 +379,8 @@ function setOwnersEditorDirty(v) {
 }
 
 function syncOwnersJsonScript(names) {
-  if (ownersEl) ownersEl.textContent = JSON.stringify(names);
+  const sorted = sortOwnersRu(names);
+  if (ownersEl) ownersEl.textContent = JSON.stringify(sorted);
 }
 
 function syncOwnersHintList(names) {
@@ -346,7 +389,7 @@ function syncOwnersHintList(names) {
   const ul = hint.querySelector('ul');
   if (!ul) return;
   ul.innerHTML = '';
-  names.forEach((n) => {
+  sortOwnersRu(names).forEach((n) => {
     const li = document.createElement('li');
     li.textContent = n;
     ul.appendChild(li);
@@ -362,6 +405,7 @@ function reconcileManualOwnersAfterListChange() {
 
 function invalidatePreviewAfterOwnersChange() {
   if (!items.length) return;
+  clearPreviewRetry();
   previewGen += 1;
   previewAbort?.abort();
   items.forEach((e) => {
@@ -688,14 +732,18 @@ function needsOwnerChoiceFromPreview(p) {
 }
 
 function ownerOptions() {
-  return [{ value: '', label: OWNER_EMPTY_LABEL }, ...CANONICAL_OWNERS.map((n) => ({ value: n, label: n }))];
+  return [{ value: '', label: OWNER_EMPTY_LABEL }, ...sortOwnersRu(CANONICAL_OWNERS).map((n) => ({ value: n, label: n }))];
 }
 
 function ownerOptionsForEntry(entry) {
   if (needsOwnerChoiceFromPreview(entry.preview)) {
-    return CANONICAL_OWNERS.map((n) => ({ value: n, label: n }));
+    return sortOwnersRu(CANONICAL_OWNERS).map((n) => ({ value: n, label: n }));
   }
   return ownerOptions();
+}
+
+function normalizeOwnerQuery(s) {
+  return String(s || '').trim().toLowerCase();
 }
 
 function positionOwnerPanel(wrap) {
@@ -765,9 +813,24 @@ function createOwnerDropdown(index, entry) {
 
   trigger.setAttribute('aria-controls', panel.id);
 
+  const searchWrap = document.createElement('div');
+  searchWrap.className = 'owner-dd__search-wrap';
+  const search = document.createElement('input');
+  search.type = 'text';
+  search.className = 'owner-dd__search';
+  search.placeholder = 'Поиск собственника…';
+  search.setAttribute('aria-label', 'Поиск собственника');
+  search.setAttribute('autocomplete', 'off');
+  searchWrap.appendChild(search);
+
   const panelScroll = document.createElement('div');
   panelScroll.className = 'owner-dd__panel-scroll';
   panelScroll.setAttribute('role', 'listbox');
+
+  const empty = document.createElement('div');
+  empty.className = 'owner-dd__empty';
+  empty.textContent = 'Ничего не найдено';
+  empty.hidden = true;
 
   opts.forEach((opt) => {
     const btn = document.createElement('button');
@@ -795,7 +858,58 @@ function createOwnerDropdown(index, entry) {
     });
     panelScroll.appendChild(btn);
   });
+  panel.appendChild(searchWrap);
   panel.appendChild(panelScroll);
+  panel.appendChild(empty);
+
+  const applyFilter = () => {
+    const q = normalizeOwnerQuery(search.value);
+    let visible = 0;
+    panelScroll.querySelectorAll('.owner-dd__option').forEach((b) => {
+      const label = (b.textContent || '').toLowerCase();
+      const show = !q || label.includes(q);
+      b.hidden = !show;
+      if (show) visible += 1;
+    });
+    empty.hidden = visible > 0;
+  };
+
+  search.addEventListener('input', applyFilter);
+  search.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      wrap.classList.remove('is-open');
+      trigger.setAttribute('aria-expanded', 'false');
+      ownerDdOpen = null;
+      trigger.focus();
+      return;
+    }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      const first = Array.from(panelScroll.querySelectorAll('.owner-dd__option')).find((b) => !b.hidden);
+      if (first instanceof HTMLButtonElement) first.focus();
+    }
+  });
+
+  panelScroll.addEventListener('keydown', (e) => {
+    const active = /** @type {HTMLElement | null} */ (document.activeElement);
+    if (!active || !active.classList.contains('owner-dd__option')) return;
+    if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+      e.preventDefault();
+      const optsEls = Array.from(panelScroll.querySelectorAll('.owner-dd__option')).filter((b) => !b.hidden);
+      const i = optsEls.indexOf(active);
+      if (i < 0) return;
+      const next = e.key === 'ArrowDown' ? optsEls[i + 1] : optsEls[i - 1];
+      if (next instanceof HTMLButtonElement) next.focus();
+    }
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      wrap.classList.remove('is-open');
+      trigger.setAttribute('aria-expanded', 'false');
+      ownerDdOpen = null;
+      trigger.focus();
+    }
+  });
 
   const editFooter = document.createElement('div');
   editFooter.className = 'owner-dd__edit-wrap';
@@ -822,6 +936,11 @@ function createOwnerDropdown(index, entry) {
       trigger.setAttribute('aria-expanded', 'true');
       ownerDdOpen = wrap;
       positionOwnerPanel(wrap);
+      search.value = '';
+      applyFilter();
+      requestAnimationFrame(() => {
+        search.focus({ preventScroll: true });
+      });
     }
   });
 
@@ -845,6 +964,10 @@ document.addEventListener('click', (e) => {
 
 window.addEventListener('scroll', syncOpenPanelPosition, true);
 window.addEventListener('resize', syncOpenPanelPosition);
+
+// На старте страницы обновим «Важно» и JSON на случай, если сервер прислал неотсортированный список.
+syncOwnersJsonScript(CANONICAL_OWNERS);
+syncOwnersHintList(CANONICAL_OWNERS);
 
 /** Строка под таблицей: актуальное число файлов (после удаления строк). Не проверять previewInFlight — из runPreview() нельзя вызывать до finally: флаг ещё true. */
 function updatePreviewDoneLine() {
@@ -879,6 +1002,7 @@ function addFiles(fileList) {
     alert('Формат файла не поддерживается');
     return;
   }
+  clearPreviewRetry();
   next.forEach((file) => items.push({ file, preview: null, manualOwner: '' }));
   syncUploadView();
   renderTable();
@@ -888,6 +1012,7 @@ function addFiles(fileList) {
 function removeFileAt(index) {
   if (index < 0 || index >= items.length) return;
   closeOwnerDropdowns(null);
+  clearPreviewRetry();
   const needPreviewAgain = previewInFlight;
   if (needPreviewAgain) {
     previewGen += 1;
@@ -1036,6 +1161,7 @@ function syncBuildButton() {
 
 async function runPreview() {
   if (!items.length) {
+    clearPreviewRetry();
     stopPreviewProgressUI();
     previewStatus.textContent = '';
     previewInFlight = false;
@@ -1043,6 +1169,11 @@ async function runPreview() {
     return;
   }
   if (previewInFlight) return;
+  if (document.visibilityState === 'hidden') {
+    // В фоне браузер может "усыпить" вкладку — безопаснее отложить запрос до возврата.
+    schedulePreviewRetry();
+    return;
+  }
   const myGen = (previewGen += 1);
   previewInFlight = true;
   previewAbort = new AbortController();
@@ -1085,10 +1216,12 @@ async function runPreview() {
       if (items[i]) items[i].preview = info;
     });
     applyPreviewOk = myGen === previewGen;
+    clearPreviewRetry();
     renderTable();
   } catch (e) {
     if (e.name === 'AbortError' || myGen !== previewGen) return;
-    previewStatus.textContent = 'Ошибка запроса предпросмотра';
+    previewStatus.textContent = 'Ошибка запроса предпросмотра (похоже, соединение прервалось)';
+    schedulePreviewRetry();
   } finally {
     previewInFlight = false;
     previewAbort = null;
@@ -1136,6 +1269,7 @@ if (uploadShell) {
 clearBtn.addEventListener('click', () => {
   items = [];
   revokeDownloadObjectUrl();
+  clearPreviewRetry();
   previewGen += 1;
   previewAbort?.abort();
   stopPreviewProgressUI();
@@ -1263,6 +1397,16 @@ toggleDropped.addEventListener('click', () => {
   toggleDropped.textContent = droppedList.classList.contains('hidden')
     ? 'Показать отброшенные строки'
     : 'Скрыть отброшенные строки';
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+  if (!items.length) return;
+  if (previewInFlight) return;
+  if (items.some((e) => !e.preview)) {
+    clearPreviewRetry();
+    void runPreview();
+  }
 });
 
 syncUploadView();

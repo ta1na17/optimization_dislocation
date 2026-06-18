@@ -224,12 +224,21 @@
       ]
     },
     {
-      "canonical_name": "Тестовая компания",
+      "canonical_name": "Логиком",
       "synonyms": [
-        "тест"
+        "Логиком"
       ],
       "file_name_synonyms": [
-        "тест"
+        "Логиком"
+      ]
+    },
+    {
+      "canonical_name": "РеилФлагманЛогистик",
+      "synonyms": [
+        "РФЛ"
+      ],
+      "file_name_synonyms": [
+        "РФЛ"
       ]
     }
   ]

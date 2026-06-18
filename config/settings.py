@@ -1,3 +1,4 @@
+import os
 import tempfile
 from pathlib import Path
 
@@ -6,6 +7,12 @@ _TEMP = Path(tempfile.gettempdir())
 SECRET_KEY = 'dev-secret-key'
 DEBUG = True
 ALLOWED_HOSTS = ['*']
+
+# Для POST из браузера по IP/домену (не только localhost): через запятую, например http://1.2.3.4:8000
+_extra_csrf = os.environ.get('DJANGO_CSRF_TRUSTED_ORIGINS', '').strip()
+CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:8000', 'http://localhost:8000']
+if _extra_csrf:
+    CSRF_TRUSTED_ORIGINS.extend(x.strip() for x in _extra_csrf.split(',') if x.strip())
 
 INSTALLED_APPS = [
     'django.contrib.admin',
